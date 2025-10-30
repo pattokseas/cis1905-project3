@@ -12,14 +12,21 @@ use std::thread;
 /// The number of workers in the server's thread pool
 const WORKERS: usize = 16;
 
-// TODO:
 // Implement the `process_message` function. This function should take a `ServerState`, a `Request`,
 // and a `TcpStream`. It should process the request and write the response to the stream.
 // Processing the request should simply require calling the appropriate function on the database
 // and then creating the appropriate response and turning it into bytes which are sent to along
 // the stream by calling the `write_all` method.
 fn process_message(state: Arc<ServerState>, request: Request, mut stream: TcpStream) {
-    todo!()
+    let response = match request {
+        Request::Publish { doc } => Response::PublishSuccess(state.database.publish(doc)),
+        Request::Search { word } => Response::SearchSuccess(state.database.search(&word)),
+        Request::Retrieve { id } => match state.database.retrieve(id) {
+            Some(doc) => Response::RetrieveSuccess(doc),
+            None => Response::Failure,
+        },
+    };
+    stream.write_all(&response.to_bytes()).unwrap();
 }
 
 /// A struct that contains the state of the server
@@ -45,13 +52,13 @@ pub struct Server {
     state: Arc<ServerState>,
 }
 impl Server {
-    // TODO:
     // Create a new server by using the `ServerState::new` function
     pub fn new() -> Self {
-        todo!()
+        Server {
+            state: Arc::new(ServerState::new()),
+        }
     }
 
-    // TODO:
     // Spawn a thread that listens for incoming connections on the given port. When a connection is
     // established, add a task to the thread pool that deserializes the request, and processes it
     // using the `process_message` function.
@@ -67,7 +74,22 @@ impl Server {
     // `ServerState` to see if the server has been stopped. If it has, you should break out of the
     // loop and return.
     fn listen(&self, port: u16) {
-        todo!()
+        let state = Arc::clone(&self.state);
+        thread::spawn(move || {
+            let listener = TcpListener::bind(("127.0.0.1", port)).unwrap();
+            while !state.is_stopped.load(Ordering::Relaxed) {
+                let (mut stream, _) = listener.accept().unwrap();
+                match Request::from_bytes(&mut stream) {
+                    Some(request) => {
+                        let state_clone = Arc::clone(&state);
+                        state.pool.execute(move || {
+                            process_message(state_clone, request, stream);
+                        });
+                    }
+                    None => {}
+                }
+            }
+        });
     }
 
     // This function has already been partially completed for you
@@ -85,8 +107,9 @@ impl Server {
             }
         }
 
-        // TODO: Call the listen function and then loop (doing nothing) until the server has been stopped
-        todo!()
+        // Call the listen function and then loop (doing nothing) until the server has been stopped
+        self.listen(port);
+        while !self.state.is_stopped.load(Ordering::Relaxed) {}
     }
     pub fn stop(&self) {
         self.state.is_stopped.store(true, Ordering::SeqCst);

@@ -14,15 +14,15 @@ impl Default for Client {
 }
 
 impl Client {
-    // TODO:
     // Create a client that will connect to the server at `address` and `port`. You can create a
     // SocketAddr from an IpAddr and a port with `SocketAddr::new(addr, port)`.
     // You can create an IpAddr from a string with `address.parse().unwrap()`.
     pub fn new(address: &str, port: u16) -> Self {
-        todo!()
+        let addr = address.parse().unwrap();
+        let socket = SocketAddr::new(addr, port);
+        Client { address: socket }
     }
 
-    // TODO:
     // This function is optional, but you may find it useful.
     // Convert the request to bytes, send it to the server, read the response to bytes, and convert
     // the response to a Response. If the response is invalid, return `None`.
@@ -32,27 +32,32 @@ impl Client {
     // You can read from the stream by calling your `Response::from_bytes` function, since
     // `TcpStream` implements `Read`.
     fn send(&self, request: &Request) -> Option<Response> {
-        todo!()
+        let mut stream = std::net::TcpStream::connect(self.address).ok()?;
+        stream.write_all(&request.to_bytes()).ok()?;
+        Response::from_bytes(&mut stream)
     }
 
-    // TODO:
     // Read the file at `path` and send a `Publish` request to the server with its contents.
     // Return the response from the server.
     //
     // You can read the contents of a file with `let s = std::fs::read_to_string(path)`.
     pub fn publish_from_path(&self, path: &str) -> Option<Response> {
-        todo!()
+        let doc = std::fs::read_to_string(path).ok()?;
+        let request = Request::Publish { doc };
+        self.send(&request)
     }
-    // TODO:
     // Send a `Search` request to the server with the given `word`. Return the response from the
     // server.
     pub fn search(&self, word: &str) -> Option<Response> {
-        todo!()
+        let request = Request::Search {
+            word: String::from(word),
+        };
+        self.send(&request)
     }
-    // TODO:
     // Send a `Retrieve` request to the server with the given `id`. Return the response from the
     // server.
     pub fn retrieve(&self, id: usize) -> Option<Response> {
-        todo!()
+        let request = Request::Retrieve { id };
+        self.send(&request)
     }
 }
